@@ -1,0 +1,23 @@
+; Empty Godot 4.1.1 project used only to produce the iOS app shell (engine + Info.plist).
+; It contains no game files. The real data (.pck) is built locally and inserted
+; into the shell IPA; at runtime the engine reads all project
+; settings from that pck.
+
+config_version=5
+
+[application]
+
+config/name="BSR Port"
+config/features=PackedStringArray("4.1", "Mobile")
+
+[display]
+
+window/size/viewport_width=960
+window/size/viewport_height=540
+window/stretch/mode="viewport"
+window/handheld/orientation=4
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

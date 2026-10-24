@@ -1,0 +1,79 @@
+name: iOS shell
+
+# Builds an unsigned iOS app shell (Godot 4.1.1 engine + Info.plist) from this empty project.
+# No game files are involved here: the owner inserts their own locally built .pck into the
+# resulting shell.ipa, then signs and installs it for personal use.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 40
+    env:
+      GODOT_VERSION: 4.1.1-stable
+      GODOT_TPL_DIR: 4.1.1.stable
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot and export templates
+        run: |
+          set -euxo pipefail
+          base=https://github.com/godotengine/godot/releases/download/$GODOT_VERSION
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}_macos.universal.zip"
+          unzip -q godot.zip
+          curl -sSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          tpl="$HOME/Library/Application Support/Godot/export_templates/$GODOT_TPL_DIR"
+          mkdir -p "$tpl"
+          unzip -q templates.tpz -d tpl_tmp
+          cp tpl_tmp/templates/ios.zip tpl_tmp/templates/version.txt "$tpl/"
+          rm -rf tpl_tmp templates.tpz godot.zip
+
+      - name: Export Xcode project
+        run: |
+          set -euxo pipefail
+          GODOT="$PWD/Godot.app/Contents/MacOS/Godot"
+          "$GODOT" --headless --path . --editor --quit || true
+          mkdir -p export
+          "$GODOT" --headless --path . --export-release "iOS" export/bsr.ipa
+          ls -la export
+
+      - name: Patch Info.plist
+        run: |
+          set -euxo pipefail
+          plist=export/bsr/bsr-Info.plist
+          pb=/usr/libexec/PlistBuddy
+          $pb -c "Delete :NSLocalNetworkUsageDescription" "$plist" || true
+          $pb -c "Add :NSLocalNetworkUsageDescription string 'Local network is used to host and join multiplayer tables over Wi-Fi.'" "$plist"
+          $pb -c "Delete :UIRequiresFullScreen" "$plist" || true
+          $pb -c "Add :UIRequiresFullScreen bool true" "$plist"
+          $pb -c "Delete :UIFileSharingEnabled" "$plist" || true
+          $pb -c "Add :UIFileSharingEnabled bool true" "$plist"
+          $pb -c "Delete :LSSupportsOpeningDocumentsInPlace" "$plist" || true
+          $pb -c "Add :LSSupportsOpeningDocumentsInPlace bool true" "$plist"
+          $pb -c "Print" "$plist"
+
+      - name: Build unsigned app
+        run: |
+          set -euxo pipefail
+          cd export
+          xcodebuild -list -project bsr.xcodeproj
+          xcodebuild -project bsr.xcodeproj -target bsr -configuration Release -sdk iphoneos \
+            SYMROOT="$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+          app=$(find build -maxdepth 2 -name "*.app" -type d | head -1)
+          echo "app: $app"
+          ls -la "$app"
+          mkdir -p ../out/Payload
+          cp -R "$app" ../out/Payload/
+          cd ../out && zip -qry shell.ipa Payload && ls -la shell.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-shell
+          path: out/shell.ipa
+          retention-days: 30

@@ -1,0 +1,6 @@
+.godot/
+export/
+out/
+Godot.app/
+*.ipa
+*.pck
