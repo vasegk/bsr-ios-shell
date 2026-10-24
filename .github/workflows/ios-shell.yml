@@ -38,7 +38,8 @@ jobs:
           GODOT="$PWD/Godot.app/Contents/MacOS/Godot"
           "$GODOT" --headless --path . --editor --quit || true
           mkdir -p export
-          "$GODOT" --headless --path . --export-release "iOS" export/bsr.ipa
+          "$GODOT" --headless --path . --export-release "iOS" export/bsr.ipa 2>&1 | tee export.log
+          if grep -q "ERROR: Project export" export.log; then exit 1; fi
           ls -la export
 
       - name: Patch Info.plist

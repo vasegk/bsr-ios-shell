@@ -8,6 +8,8 @@ config_version=5
 [application]
 
 config/name="BSR Port"
+run/main_scene="res://main.tscn"
+config/icon="res://icon.png"
 config/features=PackedStringArray("4.1", "Mobile")
 
 [display]
